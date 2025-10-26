@@ -14,10 +14,10 @@ jobs:
 
 
     steps:
-      - name: Checkout repository
+      - name: Checkout repository 25f1002038@ds.study.iitm.ac.in
         uses: actions/checkout@v4
 
-      - name: Make a change and commit (25f1002038@ds.study.iitm.ac.in)
+      - name: Make a change and commit 25f1002038@ds.study.iitm.ac.in
         run: |
           echo "Daily update: $(date)" >> daily-log.txt
           git config user.name "github-actions[bot]"

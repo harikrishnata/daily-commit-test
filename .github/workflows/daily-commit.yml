@@ -1,27 +1,62 @@
-name: Daily Commit
+name: Matrix Build with Artifacts
 
 on:
-  schedule:
-    # Runs every day at 09:00 UTC (you can pick another fixed time)
-    - cron: '0 9 * * *'
-  workflow_dispatch:  # Allows manual trigger for testing
+  push:
+  pull_request:
+  workflow_dispatch:
 
 jobs:
-  commit-job:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write  
+  build:
+    # 3 parallel variants across OSes (multi-platform)
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
 
+    runs-on: ${{ matrix.os }}
+
+    # Use bash everywhere so steps are identical on all OSes
+    defaults:
+      run:
+        shell: bash
 
     steps:
-      - name: Checkout repository 25f1002038@ds.study.iitm.ac.in
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Make a change and commit 25f1002038@ds.study.iitm.ac.in
+      # REQUIRED IDENTIFIER STEP
+      - name: matrix-54227a3
         run: |
-          echo "Daily update: $(date)" >> daily-log.txt
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add daily-log.txt
-          git commit -m "Automated daily commit: $(date)"
-          git push
+          echo "Matrix variant OS=${{ matrix.os }}"
+          echo "Runner OS is $RUNNER_OS"
+
+      - name: Generate build artifact (JSON)
+        run: |
+          mkdir -p dist
+          outfile="dist/artifact-${{ matrix.os }}.json"
+          cat > "$outfile" <<'JSON'
+          {
+            "note": "Non-empty build artifact for validation",
+            "schema": 1
+          }
+          JSON
+          # Append dynamic info so each is unique and clearly non-empty
+          {
+            printf ',\n  "variant_os": "%s"' "${{ matrix.os }}"
+            printf ',\n  "runner_os": "%s"' "$RUNNER_OS"
+            printf ',\n  "run_id": "%s"' "$GITHUB_RUN_ID"
+            printf ',\n  "sha": "%s"' "$GITHUB_SHA"
+            printf ',\n  "timestamp_utc": "%s"' "$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+            printf '\n}\n'
+          } >> "$outfile"
+          # Sanity check: file must be non-empty
+          test -s "$outfile"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          # REQUIRED prefix: build-54227a3-<variant>
+          name: build-54227a3-${{ matrix.os }}
+          path: dist/artifact-${{ matrix.os }}.json
+          if-no-files-found: error
+          retention-days: 7

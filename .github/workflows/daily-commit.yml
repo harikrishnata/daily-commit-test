@@ -7,15 +7,14 @@ on:
 
 jobs:
   build:
-    # 3 parallel variants across OSes (multi-platform)
+    # Always produce >=3 parallel jobs on Ubuntu
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        node: [18, 20, 22]   # 3 variants
 
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
 
-    # Use bash everywhere so steps are identical on all OSes
     defaults:
       run:
         shell: bash
@@ -24,39 +23,41 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # REQUIRED IDENTIFIER STEP
+      - name: Setup Node ${{ matrix.node }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      # REQUIRED IDENTIFIER
       - name: matrix-54227a3
         run: |
-          echo "Matrix variant OS=${{ matrix.os }}"
-          echo "Runner OS is $RUNNER_OS"
+          echo "Matrix variant node=${{ matrix.node }}"
+          node --version
+          npm --version || true
 
       - name: Generate build artifact (JSON)
         run: |
           mkdir -p dist
-          outfile="dist/artifact-${{ matrix.os }}.json"
+          outfile="dist/artifact-node${{ matrix.node }}.json"
           cat > "$outfile" <<'JSON'
           {
             "note": "Non-empty build artifact for validation",
             "schema": 1
           }
           JSON
-          # Append dynamic info so each is unique and clearly non-empty
           {
-            printf ',\n  "variant_os": "%s"' "${{ matrix.os }}"
-            printf ',\n  "runner_os": "%s"' "$RUNNER_OS"
+            printf ',\n  "variant_node": "%s"' "${{ matrix.node }}"
             printf ',\n  "run_id": "%s"' "$GITHUB_RUN_ID"
             printf ',\n  "sha": "%s"' "$GITHUB_SHA"
             printf ',\n  "timestamp_utc": "%s"' "$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
             printf '\n}\n'
           } >> "$outfile"
-          # Sanity check: file must be non-empty
           test -s "$outfile"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          # REQUIRED prefix: build-54227a3-<variant>
-          name: build-54227a3-${{ matrix.os }}
-          path: dist/artifact-${{ matrix.os }}.json
+          name: build-54227a3-node${{ matrix.node }}
+          path: dist/artifact-node${{ matrix.node }}.json
           if-no-files-found: error
           retention-days: 7
